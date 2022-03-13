@@ -4,7 +4,8 @@ const sanitize = require('mongo-sanitize');
 
 exports.getTasks = async (req, res) => {
     try {
-        const tasks = await Task.find();
+        const { limit, page} = req.query;
+        const tasks = await Task.paginate({}, {page: page, limit: limit});
         return res.status(200).json({
             success: true,
             count: tasks.length,

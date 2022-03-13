@@ -10,6 +10,7 @@ async function login({ user, password }) {
       headers: { "Content-Type": "application/json" },
     })
       .then((response) => {
+        console.log(response)
         if (!response.ok) {
             throw new Error(`Login error: incorrect username or password`);
         }
@@ -24,7 +25,6 @@ async function login({ user, password }) {
 function Login({onLoginSuccessful}) {
     const [user, setUser] = useState("");
     const [password, setPassword] = useState("");
-    const [onLoad, setOnLoad] = useState(false)
 
     const handleUserChange = (e) => setUser(e.target.value);
     const handlePasswordChange = (e) => setPassword(e.target.value);
@@ -32,15 +32,13 @@ function Login({onLoginSuccessful}) {
     const onSubmit = async (event) => {
         event.preventDefault();
         const loginResult = await login({ user, password });
+        console.log(loginResult);
         if (loginResult) {
           const { name, token } = loginResult;
           // Save user IDs on local storage
           localStorage.setItem("name", name);
           localStorage.setItem("token", token);
           onLoginSuccessful();
-          setOnLoad(false);
-        } else {
-          setOnLoad(false)
         }
       };
 
@@ -64,10 +62,9 @@ function Login({onLoginSuccessful}) {
                     onChange={(e)=>handlePasswordChange(e)}
                     required
                     />
-                <Button type='submit' variant="contained" color="primary" disabled={onLoad}>
+                <Button type='submit' variant="contained" color="primary">
                     Submit
                 </Button>
-                {onLoad && (<div>Loading...</div>)}
             </form>
         </div>
     )

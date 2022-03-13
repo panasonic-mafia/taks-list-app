@@ -11,12 +11,19 @@ function App() {
   const [isDialogOpen, setIsDialogOpen] = useState(false); 
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      setIsUserSignedIn(true);
-    } else {
-      setIsUserSignedIn(false)
-    };
-  }, []);
+    let isSubscribed = true;
+    function signIn() {
+      if (localStorage.getItem("token")) {
+        setIsUserSignedIn(true);
+      } else {
+        setIsUserSignedIn(false)
+      }
+    }
+    if (isSubscribed){
+      signIn();
+    }
+    return isSubscribed = false
+  }, [isUserSignedIn]);
 
   const onLoginSuccessful = () => {
     setIsUserSignedIn(true);
@@ -58,7 +65,6 @@ function App() {
           </Button>
             </div>)}
       <TaskTable isUserSignedIn={isUserSignedIn}/>
-      
     </div>
   );
 }

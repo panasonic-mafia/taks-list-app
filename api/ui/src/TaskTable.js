@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import AddBoxIcon from "@material-ui/icons/AddBox";
-import { makeStyles } from "@material-ui/core/styles";
 import { DataGrid } from '@mui/x-data-grid';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
@@ -10,14 +9,13 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import Pagination from '@mui/material/Pagination';
 import { baseUrl } from './config';
 import { Box } from '@mui/system';
 import './TaskTable.css';
 
 function TaskDialog(props) {
-
     const {isDialogOpen, onClose, submitFunction, row, handleInputChange, isEdit} = props;
-
     return (
         <Dialog open={isDialogOpen}>
                 <DialogTitle>{isEdit ? 'Update task' : 'Add task'}</DialogTitle>
@@ -63,6 +61,13 @@ function TaskDialog(props) {
                             checked={row.completed}
                             onChange={(e)=>handleInputChange('completed', e.target.checked)}
                             />
+                        <FormControlLabel 
+                            disabled
+                            control={<Checkbox />} 
+                            label="Edited by admin" 
+                            checked={row.editedByAdmin}
+                            onChange={(e)=>handleInputChange('editedByAdmin', e.target.checked)}
+                            />
                     </DialogContent>
                     <DialogActions>
                         <Button type='submit'>
@@ -79,14 +84,33 @@ function TaskDialog(props) {
 
 function TaskTable({ isUserSignedIn }) {
     const [rows, setRows] = useState([]);
-    const [newTask, setNewTask] = useState({user: '', email: '', description: '', completed: false});
-    const [editedTask, setEditedTask] = useState({_id:'', user: '', email: '', description: '', completed: false});
+    const [newTask, setNewTask] = useState({user: '', email: '', description: '', completed: false, editedByAdmin: false});
+    const [editedTask, setEditedTask] = useState({_id:'', user: '', email: '', description: '', completed: false, editedByAdmin: false});
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
+    const [pagination, setPagination] = useState({page: 1, limit: 3, totalPages: 1});
+    const [tasksReload, setTasksReload] = useState(false)
 
     React.useEffect(() => {
+        async function fetchTasks() {
+            const { page, limit } = pagination;
+            const response = await fetch(`${baseUrl}/tasks?page=${page}&limit=${limit}`, {
+                method: "GET",
+                headers: {"Content-Type": "application/json",}
+            })   
+            if (!response.ok) {
+                const message = `An error has occured ${response.status}`;
+                throw new Error(message)
+            }
+            const tasks = await response.json()
+            setRows(tasks.data.docs)
+            setPagination({
+                ...pagination,
+                totalPages: tasks.data.totalPages
+            })
+        };
         fetchTasks();
-      }, []);
+      }, [pagination.page, tasksReload]);
 
     const columns = [
         {field: "actions", headerName: 'Actions', width: 100, renderCell: (cellValues) => {
@@ -106,7 +130,7 @@ function TaskTable({ isUserSignedIn }) {
         },
         { field: "user", headerName: 'User', width: 100 },
         { field: "email", headerName: 'Email', width: 250 },
-        { field: "description", headerName: 'Desctiption', width: 700, renderCell: (cellValues) => {
+        { field: "description", headerName: 'Description', width: 700, renderCell: (cellValues) => {
             return (
                 <Box sx={{
                     maxHeight: 'inherit', 
@@ -118,21 +142,9 @@ function TaskTable({ isUserSignedIn }) {
                 </Box>
             )
         } },
-        { field: "completed", headerName: 'Done', width: 100 }
+        { field: "completed", headerName: 'Done', width: 100 },
+        { field: "editedByAdmin", headerName: 'Edited by admin', width: 150}
     ]
-
-    async function fetchTasks() {
-        const response = await fetch(`${baseUrl}/tasks`, {
-            method: "GET",
-            headers: {"Content-Type": "application/json",}
-        })   
-        if (!response.ok) {
-            const message = `An error has occured ${response.status}`;
-            throw new Error(message)
-        }
-        const tasks = await response.json()
-        setRows(tasks.data)
-    }
 
     const handleAddDialog = () => {
         setIsDialogOpen(true);
@@ -151,54 +163,59 @@ function TaskTable({ isUserSignedIn }) {
                 alert(message);
                 throw new Error(message)
             }
-            const out = await response.json()
             alert('New task successfully added.');
             setIsDialogOpen(false);
             setNewTask({user: '', email: '', description: '', completed: false});
-            await fetchTasks();
+            setTasksReload(!tasksReload);
         }
         postTask();
     }
 
     const handleEditDialog = (e, cellValues) => {
         e.preventDefault();
-        setIsDialogOpen(true)
-        setIsEdit(true)
-        setEditedTask({
-            _id: cellValues.row._id,
-            user: cellValues.row.user, 
-            email: cellValues.row.email, 
-            description: cellValues.row.description, 
-            completed: cellValues.row.completed
-        })
-
+            setIsDialogOpen(true)
+            setIsEdit(true)
+            setEditedTask({
+                _id: cellValues.row._id,
+                user: cellValues.row.user, 
+                email: cellValues.row.email, 
+                description: cellValues.row.description, 
+                completed: cellValues.row.completed,
+                editedByAdmin: cellValues.row.editedByAdmin
+            })
     }
 
     const handleEdit = (e) => {
         e.preventDefault();
-        async function postTask() {
-            const response = await fetch(`${baseUrl}/task/${editedTask._id}`, {
-                method: 'PUT',
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    user: editedTask.user, 
-                    email: editedTask.email,
-                    description: editedTask.description, 
-                    completed: editedTask.completed
+        if (localStorage.name && localStorage.name === 'admin' && localStorage.token) {
+            async function postTask() {
+                const response = await fetch(`${baseUrl}/task/${editedTask._id}`, {
+                    method: 'PUT',
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        user: editedTask.user, 
+                        email: editedTask.email,
+                        description: editedTask.description, 
+                        completed: editedTask.completed,
+                        editedByAdmin: true
+                    })
                 })
-            })
-            if (!response.ok) {
-                const message = `An error has occured ${response.status}`;
-                alert(message);
-                throw new Error(message)
+                if (!response.ok) {
+                    const message = `An error has occured ${response.status}`;
+                    alert(message);
+                    throw new Error(message)
+                }
+                alert('Task was successfully updated.');
+                setIsDialogOpen(false);
+                setEditedTask({_id:'', user: '', email: '', description: '', completed: false, editedByAdmin: false});
+                setTasksReload(!tasksReload);
+                setIsEdit(false)
             }
-            alert('Task was successfully updated.');
-            setIsDialogOpen(false);
-            setEditedTask({_id:'', user: '', email: '', description: '', completed: false});
-            await fetchTasks();
-            setIsEdit(false)
+            postTask();
+        } else {
+            alert('You are logged out, please refresh the page and login again')
         }
-        postTask();
+        
     }
 
     const handleInputChange = (key, value) => {
@@ -220,6 +237,13 @@ function TaskTable({ isUserSignedIn }) {
             setIsEdit(false)
     }
 
+    const handleChangePage = (event, value) => {
+        setPagination({
+            ...pagination,
+            page: value
+        })
+    }
+
     return (
         <React.Fragment>
             <Button onClick={handleAddDialog}>
@@ -235,6 +259,7 @@ function TaskTable({ isUserSignedIn }) {
                     pageSize={3}
                     rowsPerPageOptions={[3]}
                 />
+                <Pagination count={pagination.totalPages} page={pagination.page} onChange={(event, value)=>handleChangePage(event, value)} />
             </div>
             {isEdit ? (
                 <TaskDialog 

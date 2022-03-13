@@ -20,6 +20,10 @@ const TaskSchema = mongoose.Schema({
     completed: {
         type: Boolean,
         default: false
+    },
+    editedByAdmin: {
+        type: Boolean,
+        default: false
     }
 }) 
 
